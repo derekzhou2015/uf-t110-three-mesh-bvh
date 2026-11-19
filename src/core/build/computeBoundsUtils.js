@@ -66,3 +66,37 @@ export function getBounds( primitiveBounds, offset, count, target, centroidTarge
 	centroidTarget[ 5 ] = cmaxz;
 
 }
+
+// scratch storage reused across refit leaf computations so no per-leaf allocations occur.
+const _centroidBounds = new Float32Array( 6 );
+
+// Computes a refitted leaf's bounds using the same bounding-box convention as the build path:
+// each primitive's bounds are expanded by the float32 machine epsilon (see "computePrimitiveBounds")
+// and the leaf bounds are then taken as the union of those padded bounds. Recomputing a leaf from
+// the bare vertex hull without this padding produces tighter boxes than the build path which, at
+// float32 precision, can exclude a ray grazing a shared vertex and cause missed picks.
+//
+// The bvh's own "computePrimitiveBounds" performs the padding so every subclass keeps the exact
+// center / epsilon arithmetic its build used; "getBounds" then unions the padded primitives with
+// the same function the build uses to write a node's bounds.
+export function computeRefitBounds( bvh, offset, count, target ) {
+
+	// per-primitive padded bounds in the build path's center + half-extent format. Grown on demand
+	// but cached on the function so repeated refit calls don't reallocate for the common leaf sizes.
+	let paddedBounds = computeRefitBounds._paddedBounds;
+	if ( paddedBounds === undefined || paddedBounds.length < count * 6 ) {
+
+		paddedBounds = new Float32Array( count * 6 );
+		computeRefitBounds._paddedBounds = paddedBounds;
+
+	}
+	paddedBounds.offset = offset;
+
+	// delegate the epsilon padding to the same routine the build path runs, preserving whichever
+	// formula the bvh subclass implements (see MeshBVH vs the base BVH implementation)
+	bvh.computePrimitiveBounds( offset, count, paddedBounds );
+
+	// take the union of the padded bounds with the same function used during the build
+	return getBounds( paddedBounds, offset, count, target, _centroidBounds );
+
+}

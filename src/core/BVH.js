@@ -4,6 +4,7 @@ import { BYTES_PER_NODE, UINT32_PER_NODE, DEFAULT_OPTIONS, FLOAT32_EPSILON } fro
 import { arrayToBox } from '../utils/ArrayBoxUtilities.js';
 import { IS_LEAF, LEFT_NODE, RIGHT_NODE, COUNT, OFFSET } from './utils/nodeBufferUtils.js';
 import { buildPackedTree } from './build/buildTree.js';
+import { computeRefitBounds } from './build/computeBoundsUtils.js';
 import { shapecast as shapecastFunc } from './cast/shapecast.js';
 import { bvhcast } from './cast/bvhcast.js';
 import { BVHTraversalHelper } from './BVHTraversalHelper.js';
@@ -286,10 +287,11 @@ export class BVH {
 
 				if ( isLeaf ) {
 
-					// get the bounds
+					// get the bounds using the build path's float32 epsilon padding convention so
+					// refitted leaves stay as permissive as the originally built nodes
 					const offset = OFFSET( nodeIndex32, uint32Array );
 					const count = COUNT( nodeIndex16, uint16Array );
-					this.writePrimitiveRangeBounds( offset, count, _tempBuffer, 0 );
+					computeRefitBounds( this, offset, count, _tempBuffer );
 
 					// write directly to node bounds (already in min/max format)
 					float32Array.set( _tempBuffer, nodeIndex32 );
