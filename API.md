@@ -160,6 +160,8 @@ refit(): void
 
 Refits all BVH node bounds to reflect the current primitive positions. Faster than
 rebuilding the BVH but produces a less optimal tree after large vertex deformations.
+Each leaf's bounds are recomputed with the same padded-bounds union used during
+construction, so a refitted tree reports the same hits as a freshly built one.
 
 
 ### .getBoundingBox
@@ -483,7 +485,9 @@ refit( nodeIndices = null: Set<number> | Array<number> | null ): void
 Refit the node bounds to the current triangle positions. This is quicker than regenerating
 a new BVH but will not be optimal after significant changes to the vertices. `nodeIndices`
 is a set of node indices (provided by the `shapecast` function) that need to be refit
-including all internal nodes.
+including all internal nodes. Leaf bounds are recomputed with the same per-primitive
+`FLOAT32_EPSILON` padding and union the build uses, so a refitted tree matches a freshly
+built one and does not cull primitives that a ray merely grazes.
 
 
 ### .raycast

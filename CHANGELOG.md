@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ### Fixed
 - ParallelMeshBVHWorker: A build that throws now rejects instead of never settling and blocking later builds.
 - Workers: A failed build no longer also logs an unhandled promise rejection when the caller handles it.
+- `refit` now reproduces the bounds a fresh build would produce. A refit used to write the bare hull of a leaf's primitives, dropping the `FLOAT32_EPSILON` padding the build applies to every primitive bound, so a refitted node face could round inward by one float32 ulp. Grazing rays that skim a shared vertex - such as those along the edge of a posed blade - were then culled even though the unaccelerated triangle test hit them. Both the `MeshBVH` refit (direct and indirect) and the base `BVH.refit` used by `PointsBVH`, `LineBVH`, `SkinnedMeshBVH`, `ObjectBVH` and `ClusteredBVH` are fixed.
 
 ## [0.9.18] - 2026-11-03
 ### Added

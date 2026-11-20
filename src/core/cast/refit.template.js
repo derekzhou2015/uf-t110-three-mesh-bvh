@@ -1,5 +1,9 @@
 import { BYTES_PER_NODE, UINT32_PER_NODE } from '../Constants.js';
 import { COUNT, IS_LEAF, LEFT_NODE, OFFSET, RIGHT_NODE } from '../utils/nodeBufferUtils.js';
+import { computeRefitBounds } from '../build/computeBoundsUtils.js';
+
+// scratch bounds that receive each leaf's recomputed bounds
+const _leafBounds = /* @__PURE__ */ new Float32Array( 6 );
 
 export function refit/* @echo INDIRECT_STRING */( bvh, nodeIndices = null ) {
 
@@ -8,10 +12,6 @@ export function refit/* @echo INDIRECT_STRING */( bvh, nodeIndices = null ) {
 		nodeIndices = new Set( nodeIndices );
 
 	}
-
-	const geometry = bvh.geometry;
-	const indexArr = geometry.index ? geometry.index.array : null;
-	const posAttr = geometry.attributes.position;
 
 	let buffer, uint32Array, uint16Array, float32Array;
 	let byteOffset = 0;
@@ -36,80 +36,28 @@ export function refit/* @echo INDIRECT_STRING */( bvh, nodeIndices = null ) {
 			const offset = OFFSET( nodeIndex32, uint32Array );
 			const count = COUNT( nodeIndex16, uint16Array );
 
-			let minx = Infinity;
-			let miny = Infinity;
-			let minz = Infinity;
-			let maxx = - Infinity;
-			let maxy = - Infinity;
-			let maxz = - Infinity;
-
-			/* @if INDIRECT */
-
-			for ( let i = offset, l = offset + count; i < l; i ++ ) {
-
-				const t = 3 * bvh.resolveTriangleIndex( i );
-				for ( let j = 0; j < 3; j ++ ) {
-
-					let index = t + j;
-					index = indexArr ? indexArr[ index ] : index;
-
-					const x = posAttr.getX( index );
-					const y = posAttr.getY( index );
-					const z = posAttr.getZ( index );
-
-					if ( x < minx ) minx = x;
-					if ( x > maxx ) maxx = x;
-
-					if ( y < miny ) miny = y;
-					if ( y > maxy ) maxy = y;
-
-					if ( z < minz ) minz = z;
-					if ( z > maxz ) maxz = z;
-
-
-				}
-
-			}
-
-			/* @else */
-
-			for ( let i = 3 * offset, l = 3 * ( offset + count ); i < l; i ++ ) {
-
-				let index = indexArr[ i ];
-				const x = posAttr.getX( index );
-				const y = posAttr.getY( index );
-				const z = posAttr.getZ( index );
-
-				if ( x < minx ) minx = x;
-				if ( x > maxx ) maxx = x;
-
-				if ( y < miny ) miny = y;
-				if ( y > maxy ) maxy = y;
-
-				if ( z < minz ) minz = z;
-				if ( z > maxz ) maxz = z;
-
-			}
-
-			/* @endif */
+			// compute the bounds the same way the build computes a node's bounds - per primitive padded
+			// bounds, then their union - so a refitted leaf carries the build path's float32 epsilon
+			// padding instead of the bare hull of its primitives
+			computeRefitBounds( bvh, offset, count, _leafBounds );
 
 			if (
-				float32Array[ nodeIndex32 + 0 ] !== minx ||
-				float32Array[ nodeIndex32 + 1 ] !== miny ||
-				float32Array[ nodeIndex32 + 2 ] !== minz ||
+				float32Array[ nodeIndex32 + 0 ] !== _leafBounds[ 0 ] ||
+				float32Array[ nodeIndex32 + 1 ] !== _leafBounds[ 1 ] ||
+				float32Array[ nodeIndex32 + 2 ] !== _leafBounds[ 2 ] ||
 
-				float32Array[ nodeIndex32 + 3 ] !== maxx ||
-				float32Array[ nodeIndex32 + 4 ] !== maxy ||
-				float32Array[ nodeIndex32 + 5 ] !== maxz
+				float32Array[ nodeIndex32 + 3 ] !== _leafBounds[ 3 ] ||
+				float32Array[ nodeIndex32 + 4 ] !== _leafBounds[ 4 ] ||
+				float32Array[ nodeIndex32 + 5 ] !== _leafBounds[ 5 ]
 			) {
 
-				float32Array[ nodeIndex32 + 0 ] = minx;
-				float32Array[ nodeIndex32 + 1 ] = miny;
-				float32Array[ nodeIndex32 + 2 ] = minz;
+				float32Array[ nodeIndex32 + 0 ] = _leafBounds[ 0 ];
+				float32Array[ nodeIndex32 + 1 ] = _leafBounds[ 1 ];
+				float32Array[ nodeIndex32 + 2 ] = _leafBounds[ 2 ];
 
-				float32Array[ nodeIndex32 + 3 ] = maxx;
-				float32Array[ nodeIndex32 + 4 ] = maxy;
-				float32Array[ nodeIndex32 + 5 ] = maxz;
+				float32Array[ nodeIndex32 + 3 ] = _leafBounds[ 3 ];
+				float32Array[ nodeIndex32 + 4 ] = _leafBounds[ 4 ];
+				float32Array[ nodeIndex32 + 5 ] = _leafBounds[ 5 ];
 
 				return true;
 
